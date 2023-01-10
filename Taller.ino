@@ -213,7 +213,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
 
   else if(SA(Sensor_80) == true && SA(Sensor_100) == false){
     Peso_Sensores[4]= max(bascula.get_units(),0);
-    if (cr == false) {LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO"); cr = !cr;}
+    if (cr == false) {LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO"); cr = !cr;}
   }
 
   else if(SA(Sensor_100) == true && SA(Sensor_80) == true){
@@ -227,10 +227,14 @@ void Peso_Sensor(bool &cr, int &comprobar){
 }
 
 void Calibracion_Inicial(){
-  int comprobar = (int)Leer_Memoria(0);
+  int comprobar=0;
+  EEPROM.get(0,comprobar);
+  lcd.print(EEPROM.read(0));
+  delay(2000);
+  int aux = 1;
   bool cr = true;
 
-  if (comprobar != 1){
+  if (comprobar != aux){
     lcd.clear();
     LCD2(1,0,"CONFIGURACION",4,1,"INICIAL");
     delay(1000);
@@ -255,9 +259,12 @@ void Calibracion_Inicial(){
     EEPROM.write(0,comprobar);
     cr = false;
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
+    EEPROM.get(0,aux);
+    lcd.clear();
+    lcd.print(comprobar);
   }
 
-  if(comprobar == 1 && cr == true){
+  else if(comprobar == 1 && cr == true){
     v1 = Leer_Memoria(address);
     address += sizeof(v1);
     v2 = Leer_Memoria(address);
@@ -438,7 +445,7 @@ void ALARMA(){
 
 void setup() {
   Serial.begin(4800);
-  //EEPROM.write(0,(int)1); //descomentar para volver a realizar prueba de calibracion
+  //EEPROM.write(0,(int)10); //descomentar para volver a realizar prueba de calibracion
   pinMode(Conmutador_Maestro, INPUT);
   pinMode(Valvula_Manual, INPUT);
   pinMode(Sensor_20, INPUT);
@@ -462,7 +469,7 @@ void setup() {
   bascula.set_scale(factor_calibracion); //Funcion para obtener el peso//
 
   // FUNCION PARA LA REGRESION CUADRATICA
-  RegresionCuadratica(Peso_Sensores, Sensores,6);
+  //RegresionCuadratica(Peso_Sensores, Sensores,6);
 
   //Configuración LCD
   lcd.init();
@@ -471,7 +478,7 @@ void setup() {
   lcd.print("Bienvenido");
 
   //Calibracion inicial de la regresion cuadratica
-  //Calibracion_Inicial();
+  Calibracion_Inicial();
 
   //Configuracion de la direccion en memoria
   address = (int)Leer_Memoria(1);
@@ -482,11 +489,6 @@ void setup() {
 
 void loop() {
   EasyBuzzer.update();
-
-  // 
-
-  
-  
 
   peso_actual=max(bascula.get_units(),0); // TENER ENCUENTA A LA HORA DE CALIBRAR AL CELDA!!!!!!!
   volumen_actual=((peso_actual/9.8)/997); // Densidad del Agua en litros
