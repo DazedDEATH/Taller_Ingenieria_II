@@ -160,10 +160,10 @@ void RegresionCuadratica(double x[], double y[], double n){
 /* MANEJO DE LA MEMORIA
    DIRECCIONES RESERVADAS
    0: verificacion si se ha realizado la primera calibracion (coheficientes)
-   1: direccion actual que ocupa al momento de guarda un valor
-   2-9: coheficiente v1
-   10-7: coheficiente v2
-   18-25: coheficiente v3
+   1-2: direccion actual que ocupa al momento de guarda un valor
+   3-6: coheficiente v1
+   7-10: coheficiente v2
+   11-14: coheficiente v3
  */
  
 double Leer_Memoria(int address){
@@ -173,16 +173,16 @@ double Leer_Memoria(int address){
 }
 
 void Guardar_Memoria(double &valor) {
-  if(address < 125){
-    EEPROM.update(address, valor);
+  if(address < 1023){
+    EEPROM.put(address, valor);
     address += sizeof(valor);
-    EEPROM.update(1, address);
+    //EEPROM.put(1, address);
   }
   else{
     address = 26;
-    EEPROM.update(address, valor);
+    EEPROM.put(address, valor);
     address += sizeof(valor);
-    EEPROM.update(1, address);
+    //EEPROM.put(1, address);
   }
 }
 
@@ -201,7 +201,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
     if (cr == true) {LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO"); cr = !cr;}
   }
 
-  else if(SA(Sensor_40) == true && SA(Sensor_60) == false){
+  else if(SA(Sensor_20) == true && SA(Sensor_40) == false){
     Peso_Sensores[2]= max(bascula.get_units(),0);
     if (cr == false) {LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO"); cr = !cr;}
   }
@@ -227,14 +227,11 @@ void Peso_Sensor(bool &cr, int &comprobar){
 }
 
 void Calibracion_Inicial(){
-  int comprobar=0;
-  EEPROM.get(0,comprobar);
-  lcd.print(EEPROM.read(0));
-  delay(2000);
-  int aux = 1;
+  //variables auxiliares de control
+  byte comprobar = EEPROM.read(0);
   bool cr = true;
 
-  if (comprobar != aux){
+  if (comprobar != 1){
     lcd.clear();
     LCD2(1,0,"CONFIGURACION",4,1,"INICIAL");
     delay(1000);
@@ -248,9 +245,14 @@ void Calibracion_Inicial(){
       if(digitalRead(Conmutador_Maestro) == HIGH && digitalRead(Valvula_Manual) == HIGH){
         Peso_Sensor(cr,comprobar);
       }
-      else{
+      else if (digitalRead(Valvula_Manual) == LOW){
         lcd.clear();
         LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
+        delay(3000);
+      }
+      else if (digitalRead(Conmutador_Maestro) == LOW){
+        lcd.clear();
+        LCD2(3,0,"POR FAVOR",3,1,"ENCENDER CM");
         delay(3000);
       }
     }
@@ -259,18 +261,15 @@ void Calibracion_Inicial(){
     EEPROM.write(0,comprobar);
     cr = false;
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
-    EEPROM.get(0,aux);
-    lcd.clear();
-    lcd.print(comprobar);
   }
 
   else if(comprobar == 1 && cr == true){
     v1 = Leer_Memoria(address);
     address += sizeof(v1);
     v2 = Leer_Memoria(address);
-    address += sizeof(v1);
+    address += sizeof(v2);
     v3 = Leer_Memoria(address);
-    address += sizeof(v1);
+    address += sizeof(v3);
   }
 }
 
