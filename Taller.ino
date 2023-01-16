@@ -66,6 +66,7 @@ float tiempo_anterior=0;
 float dwdt=0;
 float dvdt=0;
 float dwdt_inicial=0;
+float dw_dt_acum = 0;
 
 //Nivel estimado
 double ecuacion_nivel = 0;
@@ -81,9 +82,13 @@ unsigned long currentMillisLed=0;
 unsigned long previousMillisLed=0;
 const long time = 200;
 
-unsigned long currentMillisBuzzer=0;
-unsigned long previousMillisBuzzer=0;
+unsigned long currentMillis_dw=0;
+unsigned long previousMillis_dw=0;
 const long time2 = 1000;
+unsigned int cnt = 0;
+
+
+
 
 //////////////////////////////////////////////////////////////
 
@@ -194,7 +199,7 @@ void LCD2(int a, int b, String ab, int c, int d, String cd){
     lcd.print(cd);
 }
 
-void Peso_Sensor(bool &cr, int &comprobar){
+void Peso_Sensor(bool &cr, byte &comprobar){
 
   if(SA(Sensor_20) == true && SA(Sensor_40) == false){
     Peso_Sensores[1]= max(bascula.get_units(),0);
@@ -420,9 +425,11 @@ bool SA(int x){
 
 
 void Parpadeo(){
+  Serial.print("PARPADEO");
   currentMillisLed = millis();
 
   digitalWrite(INDICACION, 1);
+
   if(currentMillisLed-previousMillisLed >= 1000){
     previousMillisLed=currentMillisLed;
     digitalWrite(INDICACION, 0);
@@ -430,15 +437,10 @@ void Parpadeo(){
 }
 
 void ALARMA(){
-  //currentMillisBuzzer = millis();
-
   EasyBuzzer.beep(1500,1);
-
-  /*if(currentMillisBuzzer-previousMillisBuzzer >= 1000){
-    previousMillisLed=currentMillisLed;
-    EasyBuzzer.stopBeep();
-  }*/
 }
+
+
 
 
 
@@ -506,6 +508,9 @@ void loop() {
   
   if(CM==0 && VM==1 && S20==0 && S80==0){
     //NINGUNA SALIDA 
+    cnt=0;
+    dwdt_inicial=0;
+    dw_dt_acum=0;
     state = 0;
   }
 
@@ -527,8 +532,8 @@ void loop() {
   if(state == 3 && CM==1 && VM==0 && S20==1 && S80==1){
     //DESACTIVA ELECTRO VALVULA, INDICACION VISUAL
     //peso_anterior=peso;
+    volumen_lleno=volumen_actual;
     state = 4;
-    dwdt_inicial=dwdt;
   }
 
 
@@ -537,6 +542,18 @@ void loop() {
     //APAGA INDICACION VISUAL HASTA QUE SE TERMINE DE LLENAR EL TANQUE
     //variacion_peso_inicial = ((peso_actual-peso_anterior)/1);
     state = 7;
+  }
+
+  if(state==7 && cnt<=10){
+    currentMillis_dw = millis();
+
+    if(currentMillis_dw - previousMillis_dw >= 400){
+      dw_dt_acum += dwdt;
+      cnt++;
+      previousMillis_dw=currentMillis_dw;
+
+      Serial.println("TOMANDO DATOS DW/DT");
+    }
   }
 
   if(state == 4 && CM==1 && VM==0 && S20==1 && S80==1 && Nivel_Estimado()==true){
@@ -563,6 +580,7 @@ void loop() {
 ///////////////////////////////////////  ESTADO 6 ///////////////////////////////////////////////
   if(state == 6 && CM==1 && VM==1 && S20==1 && S80==1 && Nivel_Estimado()==true){
     //indicacion visual
+    volumen_lleno=volumen_actual;
     state = 7;
   }
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -572,6 +590,7 @@ void loop() {
 ///////////////////////////////////////  ESTADO 7 ///////////////////////////////////////////////
   if(state == 7 && CM==1 && VM==1 && S20==0 && S80==0){
     //INDICACION VISUAL
+    dwdt_inicial=(dw_dt_acum/cnt);
     state = 5;
   }
 
@@ -645,18 +664,8 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
   case 7:
     digitalWrite(ELECTROVALVULA, 1);
-    digitalWrite(INDICACION, 0);
+    //digitalWrite(INDICACION, 0);
     EasyBuzzer.stopBeep();
-
-    delay(100); //MEDIO SEGUNDO PARA ESPERAR EL AUMENTO DEL DW/DT Y QUE LA VARIABLE NO SEA 0
-    
-    while(contador<1){ //WHILE PARA TOMAR LOS DATOS SOLO 1 VEZ
-      dwdt_inicial=dwdt;
-      volumen_lleno=volumen_actual;
-      Serial.print("dwdt_inicial: ");Serial.println(dwdt_inicial);
-      contador++;
-    }
-    break;
 
   case 8:
     digitalWrite(ELECTROVALVULA,1);
@@ -689,12 +698,14 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   Serial.println("///////////////////////////////// VARIABLES /////////////////////////////////");
   Serial.print("Peso: "); Serial.print(peso_actual); Serial.print("kg"); Serial.print("\t\t"); Serial.print("Peso Anterior: "); Serial.print(peso_anterior); Serial.println("kg");
   Serial.print("Volumen: "); Serial.print(volumen_actual,5); Serial.print("m3"); Serial.print("\t"); Serial.print("Volumen Anterior: "); Serial.print(volumen_anterior,5); Serial.println("m3");
-  Serial.print("Tiempo: "); Serial.print(tiempo_actual,5); Serial.print("\t\t"); Serial.print("Tiempo Anterior: "); Serial.println(tiempo_anterior,5);
+  Serial.print("Tiempo: "); Serial.print(tiempo_actual,5); Serial.print("\t"); Serial.print("Tiempo Anterior: "); Serial.println(tiempo_anterior,5);
   
   Serial.print("dw/dt: "); Serial.print(dwdt); Serial.print(" kg/s"); Serial.print("\t"); Serial.print("dv/dt: "); Serial.print(dvdt); Serial.println(" m3/s");
 
   Serial.println("//////////////////// ESTADOS ////////////////////");
   Serial.print("Estado Actual: "); Serial.println(state);
+
+  Serial.print("INICIAL: "); Serial.println(dwdt_inicial);
 
   //mostrar vaiables en pantalla
   mostrarLCD();
