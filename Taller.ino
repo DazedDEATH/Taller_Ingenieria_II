@@ -22,6 +22,7 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 #define Sensor_60 16
 #define Sensor_80 17
 #define Sensor_100 A6
+#define Boton 6
 
 #define ELECTROVALVULA 5
 #define INDICACION 11
@@ -398,14 +399,14 @@ void mostrarLCD()
 
 }
 
-void mostarLCD2()
+void mostrarLCD2()
 {
   lcd.clear();
-    lcd.setCursor(0,0);
-    //Peso jugo
-    lcd.print("Peso turno:");
-    lcd.setCursor(12,0);
-    lcd.print(volumen_total);
+  lcd.setCursor(0,0);
+  //Peso jugo
+  lcd.print("Peso turno:");
+  lcd.setCursor(12,0);
+  lcd.print(volumen_total);
 }
 
 
@@ -437,10 +438,6 @@ void ALARMA(){
   EasyBuzzer.beep(1500,1);
 }
 
-
-
-
-
 void setup() {
   Serial.begin(4800);
   //EEPROM.write(0,(int)10); //descomentar para volver a realizar prueba de calibracion
@@ -451,6 +448,7 @@ void setup() {
   pinMode(Sensor_60, INPUT);
   pinMode(Sensor_80, INPUT);
   pinMode(Sensor_100, INPUT);
+  pinMode(Boton, INPUT);
   pinMode(ELECTROVALVULA, OUTPUT);
   pinMode(INDICACION, OUTPUT);
   pinMode(ALERTA, OUTPUT);
@@ -490,7 +488,11 @@ void loop() {
 
   peso_actual=max(bascula.get_units(),0); // TENER ENCUENTA A LA HORA DE CALIBRAR AL CELDA!!!!!!!
   volumen_actual=((peso_actual/9.8)/997); // Densidad del Agua en litros
+
   tiempo_actual=(millis()/1000);
+
+  currentMillisLed = millis();
+  
 
   dwdt = (peso_actual-peso_anterior)/((tiempo_actual-tiempo_anterior));
   dvdt = ((volumen_actual-volumen_anterior) / ((tiempo_actual-tiempo_anterior)));
@@ -502,6 +504,7 @@ void loop() {
   bool S60 = SA(Sensor_60);
   bool S80 = SA(Sensor_80);
   bool S100 = SA(Sensor_100);
+  bool BT = digitalRead(Boton);
   
   if(CM==0 && VM==1 && S20==0 && S80==0){
     //NINGUNA SALIDA 
@@ -577,10 +580,12 @@ void loop() {
     state = 8;
   }
 
-  if(state==8){
-    currentMillisLed = millis();
+  //if(state==8){
 
-    if(currentMillisLed - previousMillisLed >= 600){
+  
+    if(state==8 && (currentMillisLed - previousMillisLed) >= 400){
+
+      previousMillisLed = currentMillisLed;
       
       if (ledState == LOW) {
       ledState = HIGH;
@@ -588,10 +593,11 @@ void loop() {
       ledState = LOW;
       }
 
-      currentMillisLed = previousMillisLed;
+      digitalWrite(INDICACION, ledState);
+      
       Serial.println("PARPADEO");
     }
-  }
+  //}
 
   if(state == 1 && CM==0 && VM==1 && S20==0 && S80==0){
     state = 0;
@@ -690,7 +696,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
   case 8:
     digitalWrite(ELECTROVALVULA,1);
-    digitalWrite(INDICACION, ledState);
+    
     digitalWrite(ALERTA, 0);
 
     volumen_ciclo=(volumen_lleno-volumen_vacio);
@@ -727,9 +733,17 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   Serial.print("Estado Actual: "); Serial.println(state);
 
   Serial.print("INICIAL: "); Serial.println(dwdt_inicial);
-  Serial.print(cnt);
+  Serial.println(cnt);
+
+  Serial.println(BT);
 
   //mostrar vaiables en pantalla
-  mostrarLCD();
+  if(BT==1){
+    mostrarLCD2();
+  } else {
+    mostrarLCD();
+  }
+
+  
 }
 
