@@ -86,10 +86,6 @@ unsigned long currentMillis_dw=0;
 unsigned long previousMillis_dw=0;
 const long time2 = 1000;
 unsigned int cnt = 0;
-
-
-
-
 //////////////////////////////////////////////////////////////
 
 
@@ -424,17 +420,18 @@ bool SA(int x){
 }
 
 
-void Parpadeo(){
+/*void Parpadeo(){
   Serial.print("PARPADEO");
   currentMillisLed = millis();
 
   digitalWrite(INDICACION, 1);
 
-  if(currentMillisLed-previousMillisLed >= 1000){
+  if(currentMillisLed - previousMillisLed >= 1100){
+
     previousMillisLed=currentMillisLed;
     digitalWrite(INDICACION, 0);
   }
-}
+}*/
 
 void ALARMA(){
   EasyBuzzer.beep(1500,1);
@@ -533,18 +530,21 @@ void loop() {
     //DESACTIVA ELECTRO VALVULA, INDICACION VISUAL
     //peso_anterior=peso;
     volumen_lleno=volumen_actual;
+    cnt=0;
+    dwdt_inicial=0;
+    dw_dt_acum=0;
     state = 4;
   }
 
 
 ///////////////////////////////////////  ESTADO 4  80% ///////////////////////////////////////////////7
   if(state == 4 && CM==1 && VM==1 && S20==1 && S80==1){
-    //APAGA INDICACION VISUAL HASTA QUE SE TERMINE DE LLENAR EL TANQUE
+    //APAGA INDICACION VISUAL HASTA QUE SE TERMINE DE vaciar EL TANQUE
     //variacion_peso_inicial = ((peso_actual-peso_anterior)/1);
     state = 7;
   }
 
-  if(state==7 && cnt<=10){
+  if(state==7 && cnt < 10){
     currentMillis_dw = millis();
 
     if(currentMillis_dw - previousMillis_dw >= 400){
@@ -555,6 +555,13 @@ void loop() {
       Serial.println("TOMANDO DATOS DW/DT");
     }
   }
+
+  if(state==7 && cnt==10){
+    Serial.println("INICIAL DONE");
+    dwdt_inicial=(dw_dt_acum/cnt);
+  }
+
+  //dwdt_inicial=(dw_dt_acum/cnt);
 
   if(state == 4 && CM==1 && VM==0 && S20==1 && S80==1 && Nivel_Estimado()==true){
     // EXISTE UN ERROR Y LA ELECTROVALVULA SIGUE PASANDO AGUA, SE DEBE DE GENERAR UNA ALERTA
@@ -568,6 +575,22 @@ void loop() {
   if(state == 5 && CM==1 && VM==1 && S20==0 && S80==0 && dW_dt()==true){
     //CIERRE LA VALVULA YA INDICACION INTERMITENTE
     state = 8;
+  }
+
+  if(state==8){
+    currentMillisLed = millis();
+
+    if(currentMillisLed - previousMillisLed >= 600){
+      
+      if (ledState == LOW) {
+      ledState = HIGH;
+      } else {
+      ledState = LOW;
+      }
+
+      currentMillisLed = previousMillisLed;
+      Serial.println("PARPADEO");
+    }
   }
 
   if(state == 1 && CM==0 && VM==1 && S20==0 && S80==0){
@@ -590,7 +613,6 @@ void loop() {
 ///////////////////////////////////////  ESTADO 7 ///////////////////////////////////////////////
   if(state == 7 && CM==1 && VM==1 && S20==0 && S80==0){
     //INDICACION VISUAL
-    dwdt_inicial=(dw_dt_acum/cnt);
     state = 5;
   }
 
@@ -656,20 +678,19 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
   case 6:
     digitalWrite(ELECTROVALVULA, 1);
-    digitalWrite(INDICACION, 0);
+    digitalWrite(INDICACION, 1);
     ALARMA();
-    //SonidoAlerta(); 
-    //digitalWrite(ALERTA, 1);
     break;
 
   case 7:
     digitalWrite(ELECTROVALVULA, 1);
-    //digitalWrite(INDICACION, 0);
+    digitalWrite(INDICACION, 0);
+    digitalWrite(INDICACION, 0);
     EasyBuzzer.stopBeep();
 
   case 8:
     digitalWrite(ELECTROVALVULA,1);
-    Parpadeo();
+    digitalWrite(INDICACION, ledState);
     digitalWrite(ALERTA, 0);
 
     volumen_ciclo=(volumen_lleno-volumen_vacio);
@@ -706,6 +727,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   Serial.print("Estado Actual: "); Serial.println(state);
 
   Serial.print("INICIAL: "); Serial.println(dwdt_inicial);
+  Serial.print(cnt);
 
   //mostrar vaiables en pantalla
   mostrarLCD();
