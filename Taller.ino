@@ -81,12 +81,17 @@ bool BuzzerState=LOW;
 
 unsigned long currentMillisLed=0;
 unsigned long previousMillisLed=0;
-const long time = 200;
 
 unsigned long currentMillis_dw=0;
 unsigned long previousMillis_dw=0;
-const long time2 = 1000;
+
+unsigned long currentMillis_LCD=0;
+unsigned long previousMillis_LCD=0;
+
 unsigned int cnt = 0;
+
+unsigned long delay_a=0;
+unsigned long delay_anterior=0;
 //////////////////////////////////////////////////////////////
 
 
@@ -196,14 +201,14 @@ void LCD2(int a, int b, String ab, int c, int d, String cd){
     lcd.print(cd);
 }
 
-void Peso_Sensor(bool &cr, byte &comprobar){
+void Peso_Sensor(bool &cr, int &comprobar){
 
   if(SA(Sensor_20) == true && SA(Sensor_40) == false){
     Peso_Sensores[1]= max(bascula.get_units(),0);
     if (cr == true) {LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO"); cr = !cr;}
   }
 
-  else if(SA(Sensor_20) == true && SA(Sensor_40) == false){
+  else if(SA(Sensor_40) == true && SA(Sensor_60) == false){
     Peso_Sensores[2]= max(bascula.get_units(),0);
     if (cr == false) {LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO"); cr = !cr;}
   }
@@ -228,11 +233,8 @@ void Peso_Sensor(bool &cr, byte &comprobar){
   }
 }
 
-void Calibracion_Inicial(){
-  //variables auxiliares de control
-  byte comprobar = EEPROM.read(0);
+void Calibracion_Inicial(int &comprobar){
   bool cr = true;
-
   if (comprobar != 1){
     lcd.clear();
     LCD2(1,0,"CONFIGURACION",4,1,"INICIAL");
@@ -240,32 +242,26 @@ void Calibracion_Inicial(){
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("LLENANDO TANQUE");
-    Peso_Sensores[0]= max(bascula.get_units(),0);
+    Peso_Sensores[0]= max(bascula.get_units(10),0);
     digitalWrite(ELECTROVALVULA, HIGH);
 
     while (comprobar != 1) {
-      if(digitalRead(Conmutador_Maestro) == HIGH && digitalRead(Valvula_Manual) == HIGH){
-        Peso_Sensor(cr,comprobar);
+      if(digitalRead(Valvula_Manual) == HIGH){        
+        Peso_Sensor(cr, comprobar);
       }
       else if (digitalRead(Valvula_Manual) == LOW){
         lcd.clear();
         LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
-        delay(3000);
-      }
-      else if (digitalRead(Conmutador_Maestro) == LOW){
+        delay(000);
         lcd.clear();
-        LCD2(3,0,"POR FAVOR",3,1,"ENCENDER CM");
-        delay(3000);
       }
     }
-
     RegresionCuadratica(Peso_Sensores, Sensores,6);
-    EEPROM.write(0,comprobar);
-    cr = false;
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
+    cr = false;
   }
 
-  else if(comprobar == 1 && cr == true){
+  else if(comprobar == 1, cr == true){
     v1 = Leer_Memoria(address);
     address += sizeof(v1);
     v2 = Leer_Memoria(address);
@@ -294,9 +290,6 @@ bool dW_dt(){
 }
 
 bool Nivel_Estimado(){
-
-  ecuacion_nivel = v1 + v2*peso_actual + v3*pow(peso_actual,2); 
-
   if(((ecuacion_nivel*100)/17) >= 90){
     return true;
   }else{
@@ -347,7 +340,7 @@ void mostrarLCD()
     lcd.setCursor(8,1);
     lcd.print("N:");
     lcd.setCursor(11,1);
-    lcd.print(constrain( (ecuacion_nivel*100)/17, 0,100),0); lcd.print("%");
+    lcd.print(constrain( ((ecuacion_nivel*100)/17), 0,100),0); lcd.print("%");
 
 
   /*lcd.clear();
@@ -472,9 +465,22 @@ void setup() {
   lcd.backlight();
   lcd.clear();
   lcd.print("Bienvenido");
+  delay(2000);
+  lcd.clear();
+  LCD2(1,0,"DESEA REALIZAR",1,1,"LA CALIBRACION?");
+  delay(2000);
+  lcd.clear();
+  LCD2(0,0,"PULSAR BOTON: SI",1,1,"NO PULSAR: NO");
+  int comprobar=0;
+  delay(3000);
 
-  //Calibracion inicial de la regresion cuadratica
-  Calibracion_Inicial();
+  if(digitalRead(Boton)==true){
+    comprobar=0;
+  } else {
+    comprobar=1;
+  }
+  
+  Calibracion_Inicial(comprobar);
 
   //Configuracion de la direccion en memoria
   address = (int)Leer_Memoria(1);
@@ -485,17 +491,27 @@ void setup() {
 
 void loop() {
   EasyBuzzer.update();
+  ecuacion_nivel = v1 + v2*peso_actual + v3*pow(peso_actual,2); 
 
   peso_actual=max(bascula.get_units(),0); // TENER ENCUENTA A LA HORA DE CALIBRAR AL CELDA!!!!!!!
-  volumen_actual=((peso_actual/9.8)/997); // Densidad del Agua en litros
+  volumen_actual=(((bascula.get_units())/0.998)); // Densidad del Agua  0,998 g/cm3
 
   tiempo_actual=(millis()/1000);
 
-  currentMillisLed = millis();
-  
+  delay_a = millis();
 
-  dwdt = (peso_actual-peso_anterior)/((tiempo_actual-tiempo_anterior));
-  dvdt = ((volumen_actual-volumen_anterior) / ((tiempo_actual-tiempo_anterior)));
+  if(delay_a - delay_anterior >= 1000){
+
+    delay_anterior=delay_a;
+
+    dwdt = (peso_actual-peso_anterior)/((tiempo_actual-tiempo_anterior));
+    dvdt = (volumen_actual-volumen_anterior)/((tiempo_actual-tiempo_anterior));
+    Serial.print(volumen_actual);
+
+    tiempo_anterior=tiempo_actual;
+    peso_anterior=peso_actual;
+    volumen_anterior=volumen_actual;
+  }
 
   bool CM = digitalRead(Conmutador_Maestro);
   bool VM = !(digitalRead(Valvula_Manual));
@@ -548,9 +564,10 @@ void loop() {
   }
 
   if(state==7 && cnt < 10){
-    currentMillis_dw = millis();
 
-    if(currentMillis_dw - previousMillis_dw >= 400){
+    currentMillis_dw = millis();
+    
+    if(currentMillis_dw - previousMillis_dw >= 200){
       dw_dt_acum += dwdt;
       cnt++;
       previousMillis_dw=currentMillis_dw;
@@ -580,12 +597,12 @@ void loop() {
     state = 8;
   }
 
-  //if(state==8){
+  if(state==8){
 
-  
-    if(state==8 && (currentMillisLed - previousMillisLed) >= 400){
+    currentMillisLed = millis();
 
-      previousMillisLed = currentMillisLed;
+    if(currentMillisLed - previousMillisLed >= 20){
+      
       
       if (ledState == LOW) {
       ledState = HIGH;
@@ -594,10 +611,10 @@ void loop() {
       }
 
       digitalWrite(INDICACION, ledState);
-      
       Serial.println("PARPADEO");
+      previousMillisLed = currentMillisLed;
     }
-  //}
+  }
 
   if(state == 1 && CM==0 && VM==1 && S20==0 && S80==0){
     state = 0;
@@ -703,13 +720,11 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     volumen_total+=volumen_ciclo;
     break;
  }
-
-
   Serial.println(" ");
  
-  peso_anterior=peso_actual;
-  volumen_anterior=volumen_actual;
-  tiempo_anterior=tiempo_actual;
+  
+  
+/*  
 
   Serial.println("///////////////////////////////// ENTRADAS /////////////////////////////////");
   Serial.print("CM: "); Serial.print(CM); Serial.print("\t"); Serial.print("VM: "); Serial.print(VM); Serial.print("\t"); 
@@ -736,14 +751,19 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   Serial.println(cnt);
 
   Serial.println(BT);
-
+*/
   //mostrar vaiables en pantalla
-  if(BT==1){
-    mostrarLCD2();
-  } else {
-    mostrarLCD();
+  currentMillis_LCD=millis();
+
+  if(currentMillis_LCD - previousMillis_LCD >= 550){
+
+    if(BT==1){
+      mostrarLCD2();
+    } else {
+      mostrarLCD();
+    }
+
+    previousMillis_LCD = currentMillis_LCD;
   }
 
-  
-}
-
+}
