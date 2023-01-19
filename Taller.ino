@@ -36,6 +36,7 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 /////////////////// Variables Globales ///////////////////
 int state = 0;
 int address = 2;
+bool rebound = false;
 
 double v1=0;
 double v2=0;
@@ -98,9 +99,6 @@ unsigned long delay_anterior=0;
 
 /////////////////// Funcion Especial - Regresion C ///////////////////
 void RegresionCuadratica(double x[], double y[], double n){
-  v1=0;
-  v2=0;
-  v3=0;
 
   for(int i=0; i<3; i++){
     for(int j=0; j<3; j++){
@@ -166,11 +164,10 @@ void RegresionCuadratica(double x[], double y[], double n){
 
 /* MANEJO DE LA MEMORIA
    DIRECCIONES RESERVADAS
-   0: verificacion si se ha realizado la primera calibracion (coheficientes)
-   1-2: direccion actual que ocupa al momento de guarda un valor
-   3-6: coheficiente v1
-   7-10: coheficiente v2
-   11-14: coheficiente v3
+   0-1: direccion actual que ocupa al momento de guarda un valor
+   2-5: coheficiente v1
+   6-9: coheficiente v2
+   10-13: coheficiente v3
  */
  
 double Leer_Memoria(int address){
@@ -183,14 +180,24 @@ void Guardar_Memoria(double &valor) {
   if(address < 1023){
     EEPROM.put(address, valor);
     address += sizeof(valor);
-    //EEPROM.put(1, address);
+    EEPROM.put(0, address);
   }
   else{
     address = 26;
     EEPROM.put(address, valor);
     address += sizeof(valor);
-    //EEPROM.put(1, address);
+    EEPROM.put(0, address);
   }
+}
+
+bool button(int &comprobar) {
+  if(digitalRead(Boton) == LOW) rebound = !rebound;
+  if(rebound == true && digitalRead(Boton) == HIGH){
+    rebound = !rebound;
+    comprobar = 0;
+    return true;
+  }
+  else return false;
 }
 
 void LCD2(int a, int b, String ab, int c, int d, String cd){
@@ -203,34 +210,54 @@ void LCD2(int a, int b, String ab, int c, int d, String cd){
 
 void Peso_Sensor(bool &cr, int &comprobar){
 
-  if(SA(Sensor_20) == true && SA(Sensor_40) == false){
-    Peso_Sensores[1]= max(bascula.get_units(),0);
-    if (cr == true) {LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO"); cr = !cr;}
-  }
+  if(SA(Sensor_20) == true){
 
-  else if(SA(Sensor_40) == true && SA(Sensor_60) == false){
-    Peso_Sensores[2]= max(bascula.get_units(),0);
-    if (cr == false) {LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO"); cr = !cr;}
-  }
+    if (SA(Sensor_40) == true){
 
-  else if(SA(Sensor_60) == true && SA(Sensor_80) == false){
-    Peso_Sensores[3]= max(bascula.get_units(),0);
-    if (cr == true) {LCD2(4,0,"NIVEL 60",3,1,"ALCANZADO"); cr = !cr;}
-  }
+      if (SA(Sensor_60) == true){
 
-  else if(SA(Sensor_80) == true && SA(Sensor_100) == false){
-    Peso_Sensores[4]= max(bascula.get_units(),0);
-    if (cr == false) {LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO"); cr = !cr;}
-  }
+        if(SA(Sensor_80) == true){
+          
+          if (SA(Sensor_100) == true && cr == true){
+            Peso_Sensores[5]= max(bascula.get_units(10),0);
+            lcd.clear();
+            LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
+            digitalWrite(ELECTROVALVULA, LOW);
+            comprobar = 1;
+          }
 
-  else if(SA(Sensor_100) == true && SA(Sensor_80) == true){
-    Peso_Sensores[5]= max(bascula.get_units(),0);
-    lcd.clear();
-    LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
-    digitalWrite(ELECTROVALVULA, LOW);
-    cr = false;
-    comprobar = 1;
+          else if(SA(Sensor_100) == false && cr == false){
+            Peso_Sensores[4]= max(bascula.get_units(10),0);
+            LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO");
+            cr = !cr;
+          }
+          else;
+        }
+
+        else if (SA(Sensor_80) == false && cr == true){
+          Peso_Sensores[3]= max(bascula.get_units(10),0);
+          LCD2(4,0,"NIVEL 60",3,1,"ALCANZADO");
+          cr = !cr;    
+        }
+        else;
+      }
+
+      else if (SA(Sensor_60) == false && cr == false){
+        Peso_Sensores[2]= max(bascula.get_units(10),0);
+        LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO");
+        cr = !cr;
+      }
+      else;
+    }
+
+    else if (SA(Sensor_40) == false && cr == true){
+      Peso_Sensores[1]= max(bascula.get_units(10),0);
+      LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO");
+      cr = !cr;
+    }
+    else;
   }
+  else;
 }
 
 void Calibracion_Inicial(int &comprobar){
@@ -246,15 +273,15 @@ void Calibracion_Inicial(int &comprobar){
     digitalWrite(ELECTROVALVULA, HIGH);
 
     while (comprobar != 1) {
-      if(digitalRead(Valvula_Manual) == HIGH){        
+      if (digitalRead(Valvula_Manual) == HIGH){
         Peso_Sensor(cr, comprobar);
       }
       else if (digitalRead(Valvula_Manual) == LOW){
-        lcd.clear();
         LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
-        delay(000);
+        delay(1000);
         lcd.clear();
       }
+      else;
     }
     RegresionCuadratica(Peso_Sensores, Sensores,6);
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
@@ -269,6 +296,7 @@ void Calibracion_Inicial(int &comprobar){
     v3 = Leer_Memoria(address);
     address += sizeof(v3);
   }
+  else;
 }
 
 bool dW_dt(){
@@ -464,26 +492,33 @@ void setup() {
   lcd.init();
   lcd.backlight();
   lcd.clear();
+  lcd.setCursor(0,0);
   lcd.print("Bienvenido");
   delay(2000);
   lcd.clear();
-  LCD2(1,0,"DESEA REALIZAR",1,1,"LA CALIBRACION?");
+  LCD2(0,0,"Desea realizar",0,1,"la calibracion?");
   delay(2000);
-  lcd.clear();
-  LCD2(0,0,"PULSAR BOTON: SI",1,1,"NO PULSAR: NO");
-  int comprobar=0;
-  delay(3000);
+  int comprobar = 1;
+  LCD2(0,0,"Pulsar boton: SI",0,1,"No pulsar: NO");
 
-  if(digitalRead(Boton)==true){
-    comprobar=0;
-  } else {
-    comprobar=1;
+  //Variables auxiliares
+  unsigned long pmC = 0;
+  bool aux = false;
+
+  //Esperar al usuario
+  while (aux == false){
+    if (button(comprobar) == true) break;
+    if(millis() - pmC >= 10000){
+      pmC = millis();
+      aux = true;
+    }
   }
-  
+
+  //Calibracion o cargar coeficientes
   Calibracion_Inicial(comprobar);
 
   //Configuracion de la direccion en memoria
-  address = (int)Leer_Memoria(1);
+  address = (int)Leer_Memoria(0);
 
   delay(2000);
   
@@ -766,4 +801,4 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     previousMillis_LCD = currentMillis_LCD;
   }
 
-}
+}
