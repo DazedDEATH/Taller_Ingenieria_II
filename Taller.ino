@@ -31,8 +31,6 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 #define BASCULA_DT 2
 #define BASCULA_SCLK 3
 
-
-
 /////////////////// Variables Globales ///////////////////
 int state = 0;
 int address = 2;
@@ -78,7 +76,10 @@ float factor_calibracion = -100670;
 
 // CONFIGURACION PARALELISMO
 bool ledState=LOW;
-bool BuzzerState=LOW;
+bool Buz=LOW;
+
+unsigned long currentMillisBuzzer=0;
+unsigned long previousMillisBuzzer=0;
 
 unsigned long currentMillisLed=0;
 unsigned long previousMillisLed=0;
@@ -90,11 +91,13 @@ unsigned long currentMillis_LCD=0;
 unsigned long previousMillis_LCD=0;
 
 unsigned int cnt = 0;
+bool reset_volumen = 0;
 
 unsigned long delay_a=0;
 unsigned long delay_anterior=0;
-//////////////////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////////////////
 
 
 /////////////////// Funcion Especial - Regresion C ///////////////////
@@ -219,7 +222,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
         if(SA(Sensor_80) == true){
           
           if (SA(Sensor_100) == true && cr == true){
-            Peso_Sensores[5]= max(bascula.get_units(10),0);
+            Peso_Sensores[5]= max(bascula.get_units(10),0) + 0.43;
             lcd.clear();
             LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
             digitalWrite(ELECTROVALVULA, LOW);
@@ -227,7 +230,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
           }
 
           else if(SA(Sensor_100) == false && cr == false){
-            Peso_Sensores[4]= max(bascula.get_units(10),0);
+            Peso_Sensores[4]= max(bascula.get_units(10),0) + 0.43;
             LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO");
             cr = !cr;
           }
@@ -235,7 +238,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
         }
 
         else if (SA(Sensor_80) == false && cr == true){
-          Peso_Sensores[3]= max(bascula.get_units(10),0);
+          Peso_Sensores[3]= max(bascula.get_units(10),0) + 0.43;
           LCD2(4,0,"NIVEL 60",3,1,"ALCANZADO");
           cr = !cr;    
         }
@@ -243,7 +246,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
       }
 
       else if (SA(Sensor_60) == false && cr == false){
-        Peso_Sensores[2]= max(bascula.get_units(10),0);
+        Peso_Sensores[2]= max(bascula.get_units(10),0) + 0.43;
         LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO");
         cr = !cr;
       }
@@ -251,7 +254,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
     }
 
     else if (SA(Sensor_40) == false && cr == true){
-      Peso_Sensores[1]= max(bascula.get_units(10),0);
+      Peso_Sensores[1]= max(bascula.get_units(10),0) + 0.43;
       LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO");
       cr = !cr;
     }
@@ -270,14 +273,15 @@ void Calibracion_Inicial(int &comprobar){
     lcd.setCursor(0,0);
     lcd.print("LLENANDO TANQUE");
     Peso_Sensores[0]= max(bascula.get_units(10),0);
-    digitalWrite(ELECTROVALVULA, HIGH);
 
     while (comprobar != 1) {
       if (digitalRead(Valvula_Manual) == HIGH){
         Peso_Sensor(cr, comprobar);
+        digitalWrite(ELECTROVALVULA, 0);
       }
       else if (digitalRead(Valvula_Manual) == LOW){
         LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
+        digitalWrite(ELECTROVALVULA, 1);
         delay(1000);
         lcd.clear();
       }
@@ -309,7 +313,7 @@ bool dW_dt(){
 
 
   float x=0.01*dwdt_inicial;
-  if(dwdt<x){
+  if(dwdt>=x && dwdt<=0){
     return true;
   }else{
     return false;
@@ -500,7 +504,8 @@ void setup() {
   delay(2000);
   int comprobar = 1;
   LCD2(0,0,"Pulsar boton: SI",0,1,"No pulsar: NO");
-
+  delay(3500);
+/*
   //Variables auxiliares
   unsigned long pmC = 0;
   bool aux = false;
@@ -508,10 +513,16 @@ void setup() {
   //Esperar al usuario
   while (aux == false){
     if (button(comprobar) == true) break;
-    if(millis() - pmC >= 10000){
+    if(millis() - pmC >= 8000){
       pmC = millis();
       aux = true;
     }
+  }*/
+
+    if(digitalRead(Boton)==true){
+    comprobar=0;
+  } else {
+    comprobar=1;
   }
 
   //Calibracion o cargar coeficientes
@@ -526,7 +537,7 @@ void setup() {
 
 void loop() {
   EasyBuzzer.update();
-  ecuacion_nivel = v1 + v2*peso_actual + v3*pow(peso_actual,2); 
+  ecuacion_nivel = (v1 + v2*peso_actual + v3*pow(peso_actual,2)); 
 
   peso_actual=max(bascula.get_units(),0); // TENER ENCUENTA A LA HORA DE CALIBRAR AL CELDA!!!!!!!
   volumen_actual=(((bascula.get_units())/0.998)); // Densidad del Agua  0,998 g/cm3
@@ -559,6 +570,7 @@ void loop() {
   
   if(CM==0 && VM==1 && S20==0 && S80==0){
     //NINGUNA SALIDA 
+    reset_volumen=0;
     cnt=0;
     dwdt_inicial=0;
     dw_dt_acum=0;
@@ -622,6 +634,24 @@ void loop() {
     // EXISTE UN ERROR Y LA ELECTROVALVULA SIGUE PASANDO AGUA, SE DEBE DE GENERAR UNA ALERTA
     state = 6;
   }
+
+  if(state==6){
+    currentMillisBuzzer = millis();
+
+    if(currentMillisBuzzer - previousMillisBuzzer >= 550){
+      if (Buz == LOW) {
+        ALARMA();
+        Buz=HIGH;
+      } else {
+        EasyBuzzer.stopBeep();
+        Buz = LOW;
+      }
+      Serial.println("ALARMA");
+      previousMillisBuzzer = currentMillisBuzzer;
+    }
+  }
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -737,7 +767,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   case 6:
     digitalWrite(ELECTROVALVULA, 1);
     digitalWrite(INDICACION, 1);
-    ALARMA();
+    //ALARMA();
     break;
 
   case 7:
@@ -748,18 +778,20 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
   case 8:
     digitalWrite(ELECTROVALVULA,1);
-    
     digitalWrite(ALERTA, 0);
 
-    volumen_ciclo=(volumen_lleno-volumen_vacio);
-    volumen_total+=volumen_ciclo;
+    if(reset_volumen == 0){
+      volumen_ciclo=(volumen_lleno-volumen_vacio);
+      volumen_total+=volumen_ciclo;
+      reset_volumen = 1;
+    }
     break;
  }
   Serial.println(" ");
  
   
   
-/*  
+
 
   Serial.println("///////////////////////////////// ENTRADAS /////////////////////////////////");
   Serial.print("CM: "); Serial.print(CM); Serial.print("\t"); Serial.print("VM: "); Serial.print(VM); Serial.print("\t"); 
@@ -786,7 +818,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   Serial.println(cnt);
 
   Serial.println(BT);
-*/
+
   //mostrar vaiables en pantalla
   currentMillis_LCD=millis();
 
