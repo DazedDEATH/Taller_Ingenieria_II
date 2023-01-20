@@ -130,8 +130,6 @@ void RegresionCuadratica(double x[], double y[], double n){
       Xi2Yi += pow(x[i], 2)*y[i];
     }
 
-  
-  
   A[0][0]=n;
   A[0][1]=Xi;
   A[0][2]=Xi2;
@@ -155,7 +153,7 @@ void RegresionCuadratica(double x[], double y[], double n){
   v2 = rMultiplicacion[1][0];
   v3 = rMultiplicacion[2][0];
 
-  //Guardar en la memoria
+  //  GUARDA EN LA MEMORIA
   Guardar_Memoria(v1);
   Guardar_Memoria(v2);
   Guardar_Memoria(v3);
@@ -173,18 +171,23 @@ void RegresionCuadratica(double x[], double y[], double n){
    10-13: coheficiente v3
  */
  
+//  LEE DATO EN LA MEMORIA CON LA DIRECCION ESPECIFICADA
 double Leer_Memoria(int address){
   double aux = 0;
   EEPROM.get(address, aux);
   return aux;
 }
 
+//  GUARDA UN DATO EN LA MEMORIA
 void Guardar_Memoria(double &valor) {
+
+  //  COMPRUEBA QUE LA DIRECCION NO SUPERE EL LIMITE ESTABLECIDO
   if(address < 1023){
     EEPROM.put(address, valor);
     address += sizeof(valor);
     EEPROM.put(0, address);
   }
+
   else{
     address = 26;
     EEPROM.put(address, valor);
@@ -193,16 +196,18 @@ void Guardar_Memoria(double &valor) {
   }
 }
 
+//  DETECTA CUANDO SE PULSA UN BOTON EVITANDO EL REBOTE
 bool button(int &comprobar) {
-  if(digitalRead(Boton) == LOW) rebound = !rebound;
-  if(rebound == true && digitalRead(Boton) == HIGH){
-    rebound = !rebound;
+  if(digitalRead(Boton) == HIGH) rebound = true;
+  if(rebound == true && digitalRead(Boton) == LOW){
+    rebound = false;
     comprobar = 0;
     return true;
   }
   else return false;
 }
 
+//  FUNCION AUXILIAR PARA MOSTRAR EN LA LCD
 void LCD2(int a, int b, String ab, int c, int d, String cd){
     lcd.clear();
     lcd.setCursor(a,b);
@@ -211,6 +216,7 @@ void LCD2(int a, int b, String ab, int c, int d, String cd){
     lcd.print(cd);
 }
 
+//  VERIFICA CUANDO LOS SENSORES SE ACTIVAN. EN CADA NIVEL CORRESPONDIENTE CAPTURA EL VALOR DEL PESO ACTUAL
 void Peso_Sensor(bool &cr, int &comprobar){
 
   if(SA(Sensor_20) == true){
@@ -263,9 +269,15 @@ void Peso_Sensor(bool &cr, int &comprobar){
   else;
 }
 
+//  REALIZA LA CALIBRACION INICIAL DEL SISTEMA (PROCEDIMIENTO PARA CALCULAR LOS COEFICIENTES DE LA REGRESION)
 void Calibracion_Inicial(int &comprobar){
+
+  //  VARIABLE DE CONTROL
   bool cr = true;
+
+  //  REALIZA EL PROCESO
   if (comprobar != 1){
+    
     lcd.clear();
     LCD2(1,0,"CONFIGURACION",4,1,"INICIAL");
     delay(1000);
@@ -275,10 +287,13 @@ void Calibracion_Inicial(int &comprobar){
     Peso_Sensores[0]= max(bascula.get_units(10),0);
 
     while (comprobar != 1) {
+
+      //  LLENAR EL TANQUE
       if (digitalRead(Valvula_Manual) == HIGH){
         Peso_Sensor(cr, comprobar);
         digitalWrite(ELECTROVALVULA, 0);
       }
+      
       else if (digitalRead(Valvula_Manual) == LOW){
         LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
         digitalWrite(ELECTROVALVULA, 1);
@@ -287,11 +302,16 @@ void Calibracion_Inicial(int &comprobar){
       }
       else;
     }
+
+    //  REGRESION CUADRATICA
     RegresionCuadratica(Peso_Sensores, Sensores,6);
-    LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
     cr = false;
+    LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
+    delay(2000);
+    LCD2(1,0,"ABRIR VALVULA",4,1,"MANUAL");
   }
 
+  //  CARGA LOS COEFICIENTES GUARDADOS EN LA EEPROM
   else if(comprobar == 1, cr == true){
     v1 = Leer_Memoria(address);
     address += sizeof(v1);
@@ -349,31 +369,33 @@ void mostrarElectroLCD()
   lcd.clear();
 }
 
-
+//  MUESTRA LAS VARIABLES DEL ENTORNO
 void mostrarLCD()
 {
   lcd.clear();
-  //masa
+  //  MASA
     lcd.setCursor(0,0);
     lcd.print("m:");
     lcd.setCursor(2,0);
     lcd.print(peso_actual);
-  //variacion peso
+
+  //  VARIACION DE PESO
     lcd.setCursor(8,0);
     lcd.print("dW:");
     lcd.setCursor(11,0);
     lcd.print(dwdt);
-  //caudal
+
+  //  CAUDAL
     lcd.setCursor(0,1);
     lcd.print("Q:");
     lcd.setCursor(2,1);
     lcd.print(dvdt);
-  //Nivel estimado
+
+  //  NIVEL ESTIMADO
     lcd.setCursor(8,1);
     lcd.print("N:");
     lcd.setCursor(11,1);
     lcd.print(constrain( ((ecuacion_nivel*100)/17), 0,100),0); lcd.print("%");
-
 
   /*lcd.clear();
   unsigned long t0 = 0;
@@ -424,16 +446,16 @@ void mostrarLCD()
 
 }
 
+// MUESTRA EL PESO DEL TURNO
 void mostrarLCD2()
 {
   lcd.clear();
   lcd.setCursor(0,0);
-  //Peso jugo
+  //  PESO JUGO
   lcd.print("Peso turno:");
   lcd.setCursor(12,0);
   lcd.print(volumen_total);
 }
-
 
 bool SA(int x){
   float voltaje=(analogRead(x)*(5.0 / 1023.0));
@@ -465,7 +487,8 @@ void ALARMA(){
 
 void setup() {
   Serial.begin(4800);
-  //EEPROM.write(0,(int)10); //descomentar para volver a realizar prueba de calibracion
+
+  //  CONFIGURACION DE LOS PINES
   pinMode(Conmutador_Maestro, INPUT);
   pinMode(Valvula_Manual, INPUT);
   pinMode(Sensor_20, INPUT);
@@ -482,7 +505,7 @@ void setup() {
   //CONFIGURACION BUZZER
   EasyBuzzer.setPin(12);
 
-  //CONFIGURACIÓN BASCULA 
+  //CONFIGURACION BASCULA 
   bascula.begin(BASCULA_DT, BASCULA_SCLK);
   bascula.tare();
   long zero_factor = bascula.read_average();
@@ -819,7 +842,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
   Serial.println(BT);
 
-  //mostrar vaiables en pantalla
+  //mostrar variables en pantalla
   currentMillis_LCD=millis();
 
   if(currentMillis_LCD - previousMillis_LCD >= 550){
