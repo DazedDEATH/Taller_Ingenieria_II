@@ -228,7 +228,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
         if(SA(Sensor_80) == true){
           
           if (SA(Sensor_100) == true && cr == true){
-            Peso_Sensores[5]= max(bascula.get_units(10),0) + 0.43;
+            Peso_Sensores[5]= max(bascula.get_units(10),0);
             lcd.clear();
             LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
             digitalWrite(ELECTROVALVULA, LOW);
@@ -236,7 +236,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
           }
 
           else if(SA(Sensor_100) == false && cr == false){
-            Peso_Sensores[4]= max(bascula.get_units(10),0) + 0.43;
+            Peso_Sensores[4]= max(bascula.get_units(10),0);
             LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO");
             cr = !cr;
           }
@@ -244,7 +244,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
         }
 
         else if (SA(Sensor_80) == false && cr == true){
-          Peso_Sensores[3]= max(bascula.get_units(10),0) + 0.43;
+          Peso_Sensores[3]= max(bascula.get_units(10),0);
           LCD2(4,0,"NIVEL 60",3,1,"ALCANZADO");
           cr = !cr;    
         }
@@ -252,7 +252,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
       }
 
       else if (SA(Sensor_60) == false && cr == false){
-        Peso_Sensores[2]= max(bascula.get_units(10),0) + 0.43;
+        Peso_Sensores[2]= max(bascula.get_units(10),0);
         LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO");
         cr = !cr;
       }
@@ -260,7 +260,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
     }
 
     else if (SA(Sensor_40) == false && cr == true){
-      Peso_Sensores[1]= max(bascula.get_units(10),0) + 0.43;
+      Peso_Sensores[1]= max(bascula.get_units(10),0);
       LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO");
       cr = !cr;
     }
@@ -575,7 +575,6 @@ void loop() {
 
     dwdt = (peso_actual-peso_anterior)/((tiempo_actual-tiempo_anterior));
     dvdt = (volumen_actual-volumen_anterior)/((tiempo_actual-tiempo_anterior));
-    Serial.print(volumen_actual);
 
     tiempo_anterior=tiempo_actual;
     peso_anterior=peso_actual;
@@ -593,10 +592,6 @@ void loop() {
   
   if(CM==0 && VM==1 && S20==0 && S80==0){
     //NINGUNA SALIDA 
-    reset_volumen=0;
-    cnt=0;
-    dwdt_inicial=0;
-    dw_dt_acum=0;
     state = 0;
   }
 
@@ -619,9 +614,6 @@ void loop() {
     //DESACTIVA ELECTRO VALVULA, INDICACION VISUAL
     //peso_anterior=peso;
     volumen_lleno=volumen_actual;
-    cnt=0;
-    dwdt_inicial=0;
-    dw_dt_acum=0;
     state = 4;
   }
 
@@ -753,6 +745,10 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     digitalWrite(ELECTROVALVULA, 1);
     digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
+    reset_volumen=0;
+    cnt=0;
+    dwdt_inicial=0;
+    dw_dt_acum=0;
     break;
 
   case 1:
@@ -766,6 +762,10 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
     //mostrarElectroLCD();
+    reset_volumen=0;
+    cnt=0;
+    dwdt_inicial=0;
+    dw_dt_acum=0;
     break;
 
   case 3:
@@ -804,18 +804,16 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     digitalWrite(ALERTA, 0);
 
     if(reset_volumen == 0){
+      Serial.println("VOLUMEN CICLO FINAL");
       volumen_ciclo=(volumen_lleno-volumen_vacio);
       volumen_total+=volumen_ciclo;
+      volumen_ciclo=0;
       reset_volumen = 1;
     }
     break;
  }
   Serial.println(" ");
  
-  
-  
-
-
   Serial.println("///////////////////////////////// ENTRADAS /////////////////////////////////");
   Serial.print("CM: "); Serial.print(CM); Serial.print("\t"); Serial.print("VM: "); Serial.print(VM); Serial.print("\t"); 
   Serial.print("S20: "); Serial.print(SA(Sensor_20)); Serial.print("\t");
