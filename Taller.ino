@@ -43,7 +43,7 @@ double v3=0;
 double A[3][3]={};
 double P[3][1]={};
 
-double Sensores[6]={0,3.4,6.8,10.2,13.6,17};
+double Sensores[6]={0,4,8,12,16.3,20};
 double Peso_Sensores[6]={0,0.96,2.12,3.39,4.75,6.26};
 
 float peso_actual=0;
@@ -304,15 +304,8 @@ void Calibracion_Inicial(int &comprobar){
 }
 
 bool dW_dt(){
-  /*
-  if(digitalRead(4)==1){
-    return true;
-  }else{
-    return false;
-  }*/
 
-
-  float x=0.01*dwdt_inicial;
+  float x=(0.15)*dwdt_inicial;
   if(dwdt>=x && dwdt<=0){
     return true;
   }else{
@@ -322,7 +315,7 @@ bool dW_dt(){
 }
 
 bool Nivel_Estimado(){
-  if(((ecuacion_nivel*100)/17) >= 90){
+  if(((ecuacion_nivel*100)/20) >= 90){
     return true;
   }else{
     return false;
@@ -372,7 +365,7 @@ void mostrarLCD()
     lcd.setCursor(8,1);
     lcd.print("N:");
     lcd.setCursor(11,1);
-    lcd.print(constrain( ((ecuacion_nivel*100)/17), 0,100),0); lcd.print("%");
+    lcd.print(constrain( ((ecuacion_nivel*100)/20), 0,100),0); lcd.print("%");
 
 
   /*lcd.clear();
@@ -503,7 +496,7 @@ void setup() {
   LCD2(0,0,"Desea realizar",0,1,"la calibracion?");
   delay(2000);
   int comprobar = 1;
-  LCD2(0,0,"Pulsar boton: SI",0,1,"No pulsar: NO");
+  LCD2(0,0,"Pulsar Boton: SI",0,1,"No Pulsar: NO");
   delay(3500);
 /*
   //Variables auxiliares
@@ -789,7 +782,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     }
     break;
  }
-  Serial.println(" ");
+  Serial.println(" ");/*
  
   Serial.println("///////////////////////////////// ENTRADAS /////////////////////////////////");
   Serial.print("CM: "); Serial.print(CM); Serial.print("\t"); Serial.print("VM: "); Serial.print(VM); Serial.print("\t"); 
@@ -815,7 +808,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   Serial.print("INICIAL: "); Serial.println(dwdt_inicial);
   Serial.println(cnt);
 
-  Serial.println(BT);
+  Serial.println(BT);*/
 
   //mostrar vaiables en pantalla
   currentMillis_LCD=millis();
