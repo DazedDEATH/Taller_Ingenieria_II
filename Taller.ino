@@ -195,7 +195,7 @@ void Guardar_Memoria(double &valor) {
     EEPROM.put(0, address);
   }
 }
-
+/*
 //  DETECTA CUANDO SE PULSA UN BOTON EVITANDO EL REBOTE
 bool button(int &comprobar) {
   if(digitalRead(Boton) == HIGH) rebound = true;
@@ -206,7 +206,7 @@ bool button(int &comprobar) {
   }
   else return false;
 }
-
+*/
 //  FUNCION AUXILIAR PARA MOSTRAR EN LA LCD
 void LCD2(int a, int b, String ab, int c, int d, String cd){
     lcd.clear();
@@ -229,6 +229,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
           
           if (SA(Sensor_100) == true && cr == true){
             Peso_Sensores[5]= max(bascula.get_units(10),0);
+            volumen_total = Peso_Sensores[5]/0.998;
             lcd.clear();
             LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
             digitalWrite(ELECTROVALVULA, LOW);
@@ -288,7 +289,7 @@ void Calibracion_Inicial(int &comprobar){
 
     while (comprobar != 1) {
 
-      //  LLENAR EL TANQUE
+      //  SI ... LLENAR EL TANQUE
       if (digitalRead(Valvula_Manual) == HIGH){
         Peso_Sensor(cr, comprobar);
         digitalWrite(ELECTROVALVULA, 0);
@@ -352,8 +353,7 @@ bool Nivel_Estimado(){
 
 
 
-void mostrarElectroLCD()
-{
+void mostrarElectroLCD(){
   lcd.clear();
   lcd.setCursor(0,0);
   lcd.print("Electrovalvula");
@@ -363,8 +363,7 @@ void mostrarElectroLCD()
 }
 
 //  MUESTRA LAS VARIABLES DEL ENTORNO
-void mostrarLCD()
-{
+void mostrarLCD(){
   lcd.clear();
   //  MASA
     lcd.setCursor(0,0);
@@ -440,16 +439,16 @@ void mostrarLCD()
 }
 
 // MUESTRA EL PESO DEL TURNO
-void mostrarLCD2()
-{
+void mostrarLCD2(){
   lcd.clear();
   lcd.setCursor(0,0);
   //  PESO JUGO
   lcd.print("Peso turno:");
   lcd.setCursor(12,0);
-  lcd.print(volumen_total);
+  lcd.print(volumen_total*0.998);
 }
 
+//  FUNCION PARA DETECTAR LA ACTIVACION DE LOS SENSORES DE NIVEL
 bool SA(int x){
   float voltaje=(analogRead(x)*(5.0 / 1023.0));
   
@@ -474,6 +473,7 @@ bool SA(int x){
   }
 }*/
 
+// ALARMA (BUZZER)
 void ALARMA(){
   EasyBuzzer.beep(1500,1);
 }
@@ -495,60 +495,63 @@ void setup() {
   pinMode(ALERTA, OUTPUT);
 
 
-  //CONFIGURACION BUZZER
+  //  CONFIGURACION BUZZER
   EasyBuzzer.setPin(12);
 
-  //CONFIGURACION BASCULA 
+  //  CONFIGURACION BASCULA 
   bascula.begin(BASCULA_DT, BASCULA_SCLK);
   bascula.tare();
   long zero_factor = bascula.read_average();
-  //
+  
   bascula.set_scale(factor_calibracion); //Funcion para obtener el peso//
 
-  // FUNCION PARA LA REGRESION CUADRATICA
-  //RegresionCuadratica(Peso_Sensores, Sensores,6);
-
-  //Configuración LCD
-  lcd.init();
-  lcd.backlight();
-  lcd.clear();
+  //  CONFIGURACION LCD
+    lcd.init();
+    lcd.backlight();
+    lcd.clear();
+  
+  //  INICIO DEL PROGRAMA
   lcd.setCursor(0,0);
   lcd.print("Bienvenido");
   delay(2000);
   lcd.clear();
   LCD2(0,0,"Desea realizar",0,1,"la calibracion?");
   delay(2000);
-  int comprobar = 1;
   LCD2(0,0,"Pulsar Boton: SI",0,1,"No Pulsar: NO");
-  delay(3500);
-/*
-  //Variables auxiliares
-  unsigned long pmC = 0;
-  bool aux = false;
+  //delay(3500);
 
-  //Esperar al usuario
-  while (aux == false){
-    if (button(comprobar) == true) break;
-    if(millis() - pmC >= 8000){
-      pmC = millis();
-      aux = true;
+  //  VARIABLES AUXILIARES (TEMP)
+   unsigned long pmC = 0, time = millis()+4000;
+   int comprobar = 1;
+
+  //  ESPERAR AL USUARIO
+  while (true){
+    
+    // EVITA REBOTE
+    if(digitalRead(Boton) == LOW) rebound = true;
+    if(rebound == true && digitalRead(Boton) == HIGH){
+      comprobar = 0;
+      rebound = false;
+      break;
     }
-  }*/
-
-    if(digitalRead(Boton)==true){
+    if(millis() >= time){
+      break;
+    }
+  }
+/*
+  if(digitalRead(Boton)==true){
     comprobar=0;
   } else {
     comprobar=1;
   }
-
-  //Calibracion o cargar coeficientes
+*/
+  //  INICIA CALIBRACION O CARGA LOS COEFICIENTES
   Calibracion_Inicial(comprobar);
 
-  //Configuracion de la direccion en memoria
+  //  OBTENER DIRECCION DE MEMORIA  
   address = (int)Leer_Memoria(0);
 
   delay(2000);
-  
 }
 
 void loop() {
@@ -833,7 +836,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
   Serial.println(BT);*/
 
-  //mostrar variables en pantalla
+  //  MOSTRAR VARIABLES EN PANTALLA
   currentMillis_LCD=millis();
 
   if(currentMillis_LCD - previousMillis_LCD >= 550){
@@ -846,5 +849,4 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
 
     previousMillis_LCD = currentMillis_LCD;
   }
-
 }
