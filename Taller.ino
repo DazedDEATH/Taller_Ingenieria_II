@@ -154,9 +154,9 @@ void RegresionCuadratica(double x[], double y[], double n){
   v3 = rMultiplicacion[2][0];
 
   //  GUARDA EN LA MEMORIA
-  Guardar_Memoria(v1);
-  Guardar_Memoria(v2);
-  Guardar_Memoria(v3);
+  Guardar_Memoria(v1,false);
+  Guardar_Memoria(v2,false);
+  Guardar_Memoria(v3,false);
 
   //Serial.print("La ecuación de la regresión cuadrática es la siguiente:\n y = %f X^2 + %f X + %f", v3, v2, v1);
   Serial.print("La ecuacion de la regresion cuadratica es la siguiente: "); 
@@ -179,20 +179,20 @@ double Leer_Memoria(int address){
 }
 
 //  GUARDA UN DATO EN LA MEMORIA
-void Guardar_Memoria(double &valor) {
+void Guardar_Memoria(double &valor, bool ad) {
 
   //  COMPRUEBA QUE LA DIRECCION NO SUPERE EL LIMITE ESTABLECIDO
   if(address < 1023){
     EEPROM.put(address, valor);
     address += sizeof(valor);
-    EEPROM.put(0, address);
+    if (ad == true) EEPROM.put(0, address);
   }
 
   else{
     address = 26;
     EEPROM.put(address, valor);
     address += sizeof(valor);
-    EEPROM.put(0, address);
+    if (ad ==true) EEPROM.put(0, address);
   }
 }
 /*
@@ -218,56 +218,58 @@ void LCD2(int a, int b, String ab, int c, int d, String cd){
 
 //  VERIFICA CUANDO LOS SENSORES SE ACTIVAN. EN CADA NIVEL CORRESPONDIENTE CAPTURA EL VALOR DEL PESO ACTUAL
 void Peso_Sensor(bool &cr, int &comprobar){
+  while (digitalRead(Valvula_Manual) == HIGH){
+    if(SA(Sensor_20) == true){
 
-  if(SA(Sensor_20) == true){
+      if (SA(Sensor_40) == true){
 
-    if (SA(Sensor_40) == true){
+        if (SA(Sensor_60) == true){
 
-      if (SA(Sensor_60) == true){
+          if(SA(Sensor_80) == true){
+            
+            if (SA(Sensor_100) == true && cr == true){
+              Peso_Sensores[5]= max(bascula.get_units(10),0);
+              volumen_total = Peso_Sensores[5]/0.998;
+              lcd.clear();
+              LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
+              digitalWrite(ELECTROVALVULA, LOW);
+              comprobar = 1;
+              break;
+            }
 
-        if(SA(Sensor_80) == true){
-          
-          if (SA(Sensor_100) == true && cr == true){
-            Peso_Sensores[5]= max(bascula.get_units(10),0);
-            volumen_total = Peso_Sensores[5]/0.998;
-            lcd.clear();
-            LCD2(3,0,"NIVEL 100",3,1,"ALCANZADO");
-            digitalWrite(ELECTROVALVULA, LOW);
-            comprobar = 1;
+            else if(SA(Sensor_100) == false && cr == false){
+              Peso_Sensores[4]= max(bascula.get_units(10),0);
+              LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO");
+              cr = !cr;
+            }
+            else;
           }
 
-          else if(SA(Sensor_100) == false && cr == false){
-            Peso_Sensores[4]= max(bascula.get_units(10),0);
-            LCD2(4,0,"NIVEL 80",3,1,"ALCANZADO");
-            cr = !cr;
+          else if (SA(Sensor_80) == false && cr == true){
+            Peso_Sensores[3]= max(bascula.get_units(10),0);
+            LCD2(4,0,"NIVEL 60",3,1,"ALCANZADO");
+            cr = !cr;    
           }
           else;
         }
 
-        else if (SA(Sensor_80) == false && cr == true){
-          Peso_Sensores[3]= max(bascula.get_units(10),0);
-          LCD2(4,0,"NIVEL 60",3,1,"ALCANZADO");
-          cr = !cr;    
+        else if (SA(Sensor_60) == false && cr == false){
+          Peso_Sensores[2]= max(bascula.get_units(10),0);
+          LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO");
+          cr = !cr;
         }
         else;
       }
 
-      else if (SA(Sensor_60) == false && cr == false){
-        Peso_Sensores[2]= max(bascula.get_units(10),0);
-        LCD2(4,0,"NIVEL 40",3,1,"ALCANZADO");
+      else if (SA(Sensor_40) == false && cr == true){
+        Peso_Sensores[1]= max(bascula.get_units(10),0);
+        LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO");
         cr = !cr;
       }
       else;
     }
-
-    else if (SA(Sensor_40) == false && cr == true){
-      Peso_Sensores[1]= max(bascula.get_units(10),0);
-      LCD2(4,0,"NIVEL 20",3,1,"ALCANZADO");
-      cr = !cr;
-    }
     else;
   }
-  else;
 }
 
 //  REALIZA LA CALIBRACION INICIAL DEL SISTEMA (PROCEDIMIENTO PARA CALCULAR LOS COEFICIENTES DE LA REGRESION)
@@ -731,6 +733,8 @@ if(state == 8 && CM==1 && VM==0 && S20==0 && S80==0){
 if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     //APAGADO EL COMUTADOR MAESTRO, VAYA AL ESTADO 0
     state = 0;
+    double aux = (double)volumen_total;
+    Guardar_Memoria(aux, true);
   }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -803,6 +807,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
       Serial.println("VOLUMEN CICLO FINAL");
       volumen_ciclo=(volumen_lleno-volumen_vacio);
       volumen_total+=volumen_ciclo;
+      EEPROM.put(address, volumen_total);
       volumen_ciclo=0;
       reset_volumen = 1;
     }
