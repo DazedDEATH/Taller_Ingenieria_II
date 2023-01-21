@@ -312,6 +312,12 @@ void Calibracion_Inicial(int &comprobar){
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
     delay(2000);
     LCD2(1,0,"ABRIR VALVULA",4,1,"MANUAL");
+    while(true){
+      if(SA(Sensor_20) == false){
+        delay(5000);
+        break;
+      }
+    }
   }
 
   //  CARGA LOS COEFICIENTES GUARDADOS EN LA EEPROM
@@ -448,6 +454,11 @@ void mostrarLCD2(){
   lcd.print("Peso turno:");
   lcd.setCursor(12,0);
   lcd.print(volumen_total*0.998);
+  lcd.setCursor(0,1);
+  lcd.print("Peso T.A.:");
+  lcd.setCursor(11,1);
+  float pesoAnterior = (float)Leer_Memoria(address-sizeof(volumen_total));
+  lcd.print(pesoAnterior*0.998);
 }
 
 //  FUNCION PARA DETECTAR LA ACTIVACION DE LOS SENSORES DE NIVEL
@@ -696,6 +707,8 @@ void loop() {
 
   if(state == 1 && CM==0 && VM==1 && S20==0 && S80==0){
     state = 0;
+    double aux = (double)volumen_total;
+    Guardar_Memoria(aux, true);
   }
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -719,6 +732,8 @@ void loop() {
 
   if(state == 7 && CM==0 && VM==1 && S20==0 && S80==0){
     state = 0;
+    double aux = (double)volumen_total;
+    Guardar_Memoria(aux, true);
   } 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -745,6 +760,8 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     digitalWrite(ELECTROVALVULA, 1);
     digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
+    volumen_total = 0;
+    address = (int)Leer_Memoria(0);
     reset_volumen=0;
     cnt=0;
     dwdt_inicial=0;
@@ -807,7 +824,6 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
       Serial.println("VOLUMEN CICLO FINAL");
       volumen_ciclo=(volumen_lleno-volumen_vacio);
       volumen_total+=volumen_ciclo;
-      //EEPROM.put(address, volumen_total);
       volumen_ciclo=0;
       reset_volumen = 1;
     }
