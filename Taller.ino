@@ -307,7 +307,7 @@ void Calibracion_Inicial(int &comprobar){
     }
 
     //  REGRESION CUADRATICA
-    RegresionCuadratica(Peso_Sensores, Sensores,6);
+    //RegresionCuadratica(Peso_Sensores, Sensores,6);
     cr = false;
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
     delay(2000);
@@ -807,7 +807,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
       Serial.println("VOLUMEN CICLO FINAL");
       volumen_ciclo=(volumen_lleno-volumen_vacio);
       volumen_total+=volumen_ciclo;
-      EEPROM.put(address, volumen_total);
+      //EEPROM.put(address, volumen_total);
       volumen_ciclo=0;
       reset_volumen = 1;
     }
