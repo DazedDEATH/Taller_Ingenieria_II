@@ -561,8 +561,14 @@ void setup() {
   //  INICIA CALIBRACION O CARGA LOS COEFICIENTES
   Calibracion_Inicial(comprobar);
 
-  //  OBTENER DIRECCION DE MEMORIA  
-  address = (int)Leer_Memoria(0);
+  /*  OBTENER DIRECCION DE MEMORIA 
+  if(EEPROM.read(14) == 0) {
+    address = 14;
+  }
+  else{
+    address = (int)Leer_Memoria(0);
+  }
+  */
 
   delay(2000);
 }
@@ -626,6 +632,24 @@ void loop() {
     state = 4;
   }
 
+  if((state == 1 or state == 2 or state == 3 or state == 4) and VM == 1 and S80 == 0){
+    // ALARMA
+    currentMillisBuzzer = millis();
+
+    if(currentMillisBuzzer - previousMillisBuzzer >= 550){
+      if (Buz == LOW) {
+        ALARMA();
+        Buz=HIGH;
+      } else {
+        EasyBuzzer.stopBeep();
+        Buz = LOW;
+      }
+      Serial.println("ALARMA");
+      previousMillisBuzzer = currentMillisBuzzer;
+    }
+    lcd.clear();  
+    LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
+  }
 
 ///////////////////////////////////////  ESTADO 4  80% ///////////////////////////////////////////////7
   if(state == 4 && CM==1 && VM==1 && S20==1 && S80==1){
@@ -761,7 +785,13 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
     volumen_total = 0;
-    address = (int)Leer_Memoria(0);
+    // LEER DIRECCION EN MEMORIA
+      if(EEPROM.read(14) == 0) {
+        address = 14;
+      }
+      else{
+        address = (int)Leer_Memoria(0);
+      }
     reset_volumen=0;
     cnt=0;
     dwdt_inicial=0;
