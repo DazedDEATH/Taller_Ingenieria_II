@@ -33,8 +33,9 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 
 /////////////////// Variables Globales ///////////////////
 int state = 0;
-int address = 2;
-bool rebound = false;
+float address = 4;
+float pesoAnterior = 0;
+bool rebound = false, volAux = false;
 
 double v1=0;
 double v2=0;
@@ -172,7 +173,7 @@ void RegresionCuadratica(double x[], double y[], double n){
  */
  
 //  LEE DATO EN LA MEMORIA CON LA DIRECCION ESPECIFICADA
-double Leer_Memoria(int address){
+double Leer_Memoria(float address){
   double aux = 0;
   EEPROM.get(address, aux);
   return aux;
@@ -182,14 +183,14 @@ double Leer_Memoria(int address){
 void Guardar_Memoria(double &valor, bool ad) {
 
   //  COMPRUEBA QUE LA DIRECCION NO SUPERE EL LIMITE ESTABLECIDO
-  if(address < 1023){
+  if(address < EEPROM.length()){
     EEPROM.put(address, valor);
     address += sizeof(valor);
     if (ad == true) EEPROM.put(0, address);
   }
 
   else{
-    address = 26;
+    address = 14;
     EEPROM.put(address, valor);
     address += sizeof(valor);
     if (ad ==true) EEPROM.put(0, address);
@@ -273,7 +274,7 @@ void Peso_Sensor(bool &cr, int &comprobar){
 }
 
 //  REALIZA LA CALIBRACION INICIAL DEL SISTEMA (PROCEDIMIENTO PARA CALCULAR LOS COEFICIENTES DE LA REGRESION)
-void Calibracion_Inicial(int &comprobar){
+bool Calibracion_Inicial(int &comprobar){
 
   //  VARIABLE DE CONTROL
   bool cr = true;
@@ -307,7 +308,7 @@ void Calibracion_Inicial(int &comprobar){
     }
 
     //  REGRESION CUADRATICA
-    //RegresionCuadratica(Peso_Sensores, Sensores,6);
+    RegresionCuadratica(Peso_Sensores, Sensores,6);
     cr = false;
     LCD2(1,0,"CONFIGURACION",3,1,"FINALIZADA");
     delay(2000);
@@ -318,6 +319,7 @@ void Calibracion_Inicial(int &comprobar){
         break;
       }
     }
+    return true;
   }
 
   //  CARGA LOS COEFICIENTES GUARDADOS EN LA EEPROM
@@ -328,6 +330,7 @@ void Calibracion_Inicial(int &comprobar){
     address += sizeof(v2);
     v3 = Leer_Memoria(address);
     address += sizeof(v3);
+    return false;
   }
   else;
 }
@@ -454,10 +457,13 @@ void mostrarLCD2(){
   lcd.print("Peso turno:");
   lcd.setCursor(12,0);
   lcd.print(volumen_total*0.998);
+  lcd.setCursor(14,1);
+  lcd.print("S");
+  lcd.setCursor(15,1);
+  lcd.print(state);
   lcd.setCursor(0,1);
-  lcd.print("Peso T.A.:");
-  lcd.setCursor(11,1);
-  float pesoAnterior = (float)Leer_Memoria(address-sizeof(volumen_total));
+  lcd.print("P.A.:");
+  lcd.setCursor(6,1);
   lcd.print(pesoAnterior*0.998);
 }
 
@@ -559,17 +565,9 @@ void setup() {
   }
 */
   //  INICIA CALIBRACION O CARGA LOS COEFICIENTES
-  Calibracion_Inicial(comprobar);
+  volAux = Calibracion_Inicial(comprobar);
 
-  /*  OBTENER DIRECCION DE MEMORIA 
-  if(EEPROM.read(14) == 0) {
-    address = 14;
-  }
-  else{
-    address = (int)Leer_Memoria(0);
-  }
-  */
-
+  Serial.print((float)Leer_Memoria(0));
   delay(2000);
 }
 
@@ -633,22 +631,9 @@ void loop() {
   }
 
   if((state == 1 or state == 2 or state == 3 or state == 4) and VM == 1 and S80 == 0){
-    // ALARMA
-    currentMillisBuzzer = millis();
-
-    if(currentMillisBuzzer - previousMillisBuzzer >= 550){
-      if (Buz == LOW) {
-        ALARMA();
-        Buz=HIGH;
-      } else {
-        EasyBuzzer.stopBeep();
-        Buz = LOW;
-      }
-      Serial.println("ALARMA");
-      previousMillisBuzzer = currentMillisBuzzer;
-    }
-    lcd.clear();  
-    LCD2(3,0,"POR FAVOR",3,1,"CERRAR VM");
+    // ALERTA
+    digitalWrite(INDICACION,1);
+    digitalWrite(ELECTROVALVULA, 1);
   }
 
 ///////////////////////////////////////  ESTADO 4  80% ///////////////////////////////////////////////7
@@ -733,6 +718,7 @@ void loop() {
     state = 0;
     double aux = (double)volumen_total;
     Guardar_Memoria(aux, true);
+    volAux = false;
   }
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -751,6 +737,7 @@ void loop() {
 ///////////////////////////////////////  ESTADO 7 ///////////////////////////////////////////////
   if(state == 7 && CM==1 && VM==1 && S20==0 && S80==0){
     //INDICACION VISUAL
+    dwdt_inicial=(dw_dt_acum/cnt);    
     state = 5;
   }
 
@@ -758,6 +745,7 @@ void loop() {
     state = 0;
     double aux = (double)volumen_total;
     Guardar_Memoria(aux, true);
+    volAux = false;
   } 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -774,6 +762,7 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     state = 0;
     double aux = (double)volumen_total;
     Guardar_Memoria(aux, true);
+    volAux = false;
   }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -782,15 +771,22 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
   switch(state){
   case 0:
     digitalWrite(ELECTROVALVULA, 1);
-    digitalWrite(INDICACION, 0);
+    if (digitalRead(Valvula_Manual) == 1) digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
-    volumen_total = 0;
+    if (volAux == false){
+      volumen_total = 0;
+    }
+    
     // LEER DIRECCION EN MEMORIA
-      if(EEPROM.read(14) == 0) {
-        address = 14;
+      if(Leer_Memoria(18) == 0) {
+        address = 18;
       }
       else{
-        address = (int)Leer_Memoria(0);
+        address = Leer_Memoria(0);
+        Serial.println(address);
+        if (address > 21) pesoAnterior = (float)Leer_Memoria(address-4);
+        else if (address < 21) pesoAnterior = 0;
+        //Serial.print(pesoAnterior);
       }
     reset_volumen=0;
     cnt=0;
@@ -805,8 +801,8 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     break;
 
   case 2:
-    digitalWrite(ELECTROVALVULA, 0);
-    digitalWrite(INDICACION, 0);
+    if (digitalRead(Valvula_Manual) == 1) digitalWrite(ELECTROVALVULA, 0);
+    if (digitalRead(Valvula_Manual) == 1) digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
     //mostrarElectroLCD();
     reset_volumen=0;
@@ -816,8 +812,8 @@ if(state == 8 && CM==0 && VM==0 && S20==0 && S80==0){
     break;
 
   case 3:
-    digitalWrite(ELECTROVALVULA, 0);
-    digitalWrite(INDICACION, 0);
+    if (digitalRead(Valvula_Manual) == 1) digitalWrite(ELECTROVALVULA, 0);
+    if (digitalRead(Valvula_Manual) == 1) digitalWrite(INDICACION, 0);
     digitalWrite(ALERTA, 0);
     //mostrarElectroLCD();
     break;
